@@ -2,8 +2,8 @@ import requests
 import logging
 
 
-#API_URL = "https://tools-httpstatus.pickup-services.com/"
-API_URL = "https://httpstat.us/"
+API_URL = "https://tools-httpstatus.pickup-services.com/"
+
 
 logging.basicConfig(
     level=logging.INFO,
