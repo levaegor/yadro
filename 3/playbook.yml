@@ -1,0 +1,101 @@
+- name: Deploy and Test Docker Container
+  hosts: all
+  become: yes
+  vars:
+    project_dir: "{{ playbook_dir }}/.."
+    image_name: "yadro-httpstat-image"
+    container_name: "yadro-httpstat-container"
+
+  tasks:
+    - name: Install Docker and dependencies (Debian/Ubuntu)
+      block:
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+        - name: Install dependencies
+          apt:
+            name: ['apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common']
+            state: present
+        - name: Install Docker
+          apt:
+            name: ['docker.io']
+            state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install Docker and dependencies (RedHat/CentOS)
+      block:
+        - name: Install dependencies
+          yum:
+            name: ['yum-utils', 'device-mapper-persistent-data', 'lvm2']
+            state: present
+        - name: Install Docker
+          yum:
+            name: ['docker']
+            state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure docker group exists (Linux)
+      group:
+        name: docker
+        state: present
+      when: ansible_os_family in ['Debian', 'RedHat']
+
+    - name: Add current user to docker group (Linux)
+      user:
+        name: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+        groups: docker
+        append: yes
+      when: ansible_os_family in ['Debian', 'RedHat']
+
+    - name: Start and enable Docker service (Linux)
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: ansible_os_family in ['Debian', 'RedHat']
+
+    - name: Check Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+      become: no
+
+    - name: Display Docker version
+      debug:
+        msg: "Docker installed successfully: {{ docker_version.stdout }}"
+
+    - name: Build Docker image
+      command: >
+        docker build -t {{ image_name }} -f 2/Dockerfile .
+      args:
+        chdir: "{{ project_dir }}"
+      become: no
+
+    - name: Remove existing container if it exists
+      command: docker rm -f {{ container_name }}
+      ignore_errors: yes
+      changed_when: false
+      become: no
+
+    - name: Run container
+      command: docker run --name {{ container_name }} {{ image_name }}
+      register: container_run
+      ignore_errors: yes
+      become: no
+
+    - name: Verify container script exit code
+      assert:
+        that:
+          - container_run.rc == 0
+        fail_msg: "Script failed with exit code {{ container_run.rc }}"
+        success_msg: "Script completed successfully with exit code 0"
+
+    - name: Fetch container logs
+      command: docker logs {{ container_name }}
+      register: container_logs
+      changed_when: false
+      become: no
+
+    - name: Display container logs
+      debug:
+        msg: "{{ container_logs.stdout_lines + container_logs.stderr_lines }}"
