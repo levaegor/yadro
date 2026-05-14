@@ -5,5 +5,5 @@
 Для запуска через Ansible необходимо выполнить команду из директории с плейбуком (предполагается, что у Вас есть файл hosts.ini с необходимыми Вам хостами):
 
 ```bash
-ansible-playbook -i hosts.ini playbook.yml --ask-become-pass
+ansible-playbook -i /path/to/hosts.ini playbook.yml --ask-become-pass
 ```
